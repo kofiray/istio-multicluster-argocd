@@ -180,12 +180,16 @@ resource "azurerm_cdn_frontdoor_origin" "origin_uksouth" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = replace(replace(azurerm_kubernetes_cluster.uksouth.kube_config[0].host, "https://", ""), ":443", "")
+  host_name                      = helm_release.argocd_uksouth.status[0].load_balancer_ip
   http_port                      = 80
-  https_port                     = 80
+  https_port                     = 443
   origin_host_header             = var.app_hostname
   priority                       = 1
   weight                         = 50
+
+  depends_on = [
+    helm_release.argocd_uksouth
+  ]
 }
 
 # Create Front Door Origin for UK West
@@ -195,12 +199,16 @@ resource "azurerm_cdn_frontdoor_origin" "origin_ukwest" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = replace(replace(azurerm_kubernetes_cluster.ukwest.kube_config[0].host, "https://", ""), ":443", "")
+  host_name                      = helm_release.argocd_ukwest.status[0].load_balancer_ip
   http_port                      = 80
-  https_port                     = 80
+  https_port                     = 443
   origin_host_header             = var.app_hostname
   priority                       = 1
   weight                         = 50
+
+  depends_on = [
+    helm_release.argocd_ukwest
+  ]
 }
 
 # Create Front Door Route
