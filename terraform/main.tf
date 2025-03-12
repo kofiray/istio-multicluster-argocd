@@ -534,15 +534,4 @@ resource "kubernetes_manifest" "istio_applicationsets" {
     kubernetes_manifest.argocd_repo_uksouth,
     kubernetes_manifest.argocd_repo_ukwest
   ]
-}
-
-# Output the kubeconfig for both clusters
-output "uksouth_kube_config" {
-  value     = azurerm_kubernetes_cluster.uksouth.kube_config_raw
-  sensitive = true
-}
-
-output "ukwest_kube_config" {
-  value     = azurerm_kubernetes_cluster.ukwest.kube_config_raw
-  sensitive = true
 } 
