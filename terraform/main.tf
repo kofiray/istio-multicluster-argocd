@@ -180,7 +180,7 @@ resource "azurerm_cdn_frontdoor_origin" "origin_uksouth" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
+  host_name                      = replace(replace(azurerm_kubernetes_cluster.uksouth.kube_config[0].host, "https://", ""), ":443", "")
   http_port                      = 80
   https_port                     = 80
   origin_host_header             = var.app_hostname
@@ -195,7 +195,7 @@ resource "azurerm_cdn_frontdoor_origin" "origin_ukwest" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
+  host_name                      = replace(replace(azurerm_kubernetes_cluster.ukwest.kube_config[0].host, "https://", ""), ":443", "")
   http_port                      = 80
   https_port                     = 80
   origin_host_header             = var.app_hostname
