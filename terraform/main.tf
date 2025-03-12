@@ -173,6 +173,30 @@ resource "azurerm_cdn_frontdoor_origin_group" "origin_group" {
   }
 }
 
+# Get ArgoCD Server Service IP for UK South
+data "kubernetes_service" "argocd_server_uksouth" {
+  provider = kubernetes.uksouth
+  metadata {
+    name      = "argocd-server"
+    namespace = kubernetes_namespace.argocd_uksouth.metadata[0].name
+  }
+  depends_on = [
+    helm_release.argocd_uksouth
+  ]
+}
+
+# Get ArgoCD Server Service IP for UK West
+data "kubernetes_service" "argocd_server_ukwest" {
+  provider = kubernetes.ukwest
+  metadata {
+    name      = "argocd-server"
+    namespace = kubernetes_namespace.argocd_ukwest.metadata[0].name
+  }
+  depends_on = [
+    helm_release.argocd_ukwest
+  ]
+}
+
 # Create Front Door Origin for UK South
 resource "azurerm_cdn_frontdoor_origin" "origin_uksouth" {
   name                          = var.frontdoor_origin_name_uksouth
@@ -180,7 +204,7 @@ resource "azurerm_cdn_frontdoor_origin" "origin_uksouth" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = helm_release.argocd_uksouth.status[0].load_balancer_ip
+  host_name                      = data.kubernetes_service.argocd_server_uksouth.status[0].load_balancer[0].ingress[0].ip
   http_port                      = 80
   https_port                     = 443
   origin_host_header             = var.app_hostname
@@ -188,7 +212,8 @@ resource "azurerm_cdn_frontdoor_origin" "origin_uksouth" {
   weight                         = 50
 
   depends_on = [
-    helm_release.argocd_uksouth
+    helm_release.argocd_uksouth,
+    data.kubernetes_service.argocd_server_uksouth
   ]
 }
 
@@ -199,7 +224,7 @@ resource "azurerm_cdn_frontdoor_origin" "origin_ukwest" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = helm_release.argocd_ukwest.status[0].load_balancer_ip
+  host_name                      = data.kubernetes_service.argocd_server_ukwest.status[0].load_balancer[0].ingress[0].ip
   http_port                      = 80
   https_port                     = 443
   origin_host_header             = var.app_hostname
@@ -207,7 +232,8 @@ resource "azurerm_cdn_frontdoor_origin" "origin_ukwest" {
   weight                         = 50
 
   depends_on = [
-    helm_release.argocd_ukwest
+    helm_release.argocd_ukwest,
+    data.kubernetes_service.argocd_server_ukwest
   ]
 }
 
