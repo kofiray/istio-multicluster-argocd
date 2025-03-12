@@ -23,6 +23,7 @@ istio-multicluster-argocd/
 │   ├── main.tf
 │   ├── variables.tf
 │   ├── aks-clusters.tf
+│   ├── terraform.tfvars.example
 │   └── terraform.tfvars
 ├── .gitignore
 └── README.md
@@ -52,12 +53,56 @@ istio-multicluster-argocd/
    cd terraform
    cp terraform.tfvars.example terraform.tfvars
    ```
-   Edit `terraform.tfvars` with your specific values for:
-   - AKS cluster configurations (resource group, locations, node sizes)
-   - Azure Front Door settings
-   - ArgoCD Helm chart version
-   - Git repository URL
-   - Resource tags
+   
+   Edit `terraform.tfvars` with your specific values. Here's a detailed explanation of each variable:
+
+   ### AKS Cluster Configuration
+   ```hcl
+   aks_resource_group_name = "istio-aks-rg"     # Resource group for AKS clusters
+   resource_group_name     = "istio-frontdoor-rg" # Resource group for Front Door
+   kubernetes_version      = "1.27.3"            # Kubernetes version (optional)
+   node_count             = 3                    # Number of nodes in default pool (optional)
+   vm_size                = "Standard_D4s_v3"    # VM size for default pool (optional)
+   gateway_vm_size        = "Standard_D4s_v3"    # VM size for gateway nodes (optional)
+   gateway_node_count     = 2                    # Number of gateway nodes (optional)
+   ```
+
+   ### Kubeconfig Paths
+   ```hcl
+   uksouth_kubeconfig_path = "~/.kube/config-uksouth"  # Path to UK South kubeconfig
+   ukwest_kubeconfig_path  = "~/.kube/config-ukwest"   # Path to UK West kubeconfig
+   ```
+
+   ### Azure Front Door Configuration
+   ```hcl
+   frontdoor_profile_name        = "istio-frontdoor"     # Front Door profile name
+   frontdoor_endpoint_name      = "istio-endpoint"       # Endpoint name
+   frontdoor_origin_group_name  = "istio-origin-group"   # Origin group name
+   frontdoor_origin_name_uksouth = "uksouth-origin"      # UK South origin name
+   frontdoor_origin_name_ukwest  = "ukwest-origin"       # UK West origin name
+   frontdoor_route_name         = "istio-route"          # Route name
+   app_hostname                 = "istio.example.com"     # Application hostname
+   ```
+
+   ### Git Repository Configuration
+   ```hcl
+   git_repository_url = "https://github.com/yourusername/istio-multicluster-argocd.git"
+   git_username      = "your-github-username"
+   ```
+
+   ### ArgoCD Configuration
+   ```hcl
+   argocd_helm_version = "5.51.6"  # ArgoCD Helm chart version
+   ```
+
+   ### Resource Tags (Optional)
+   ```hcl
+   tags = {
+     Environment = "Production"
+     Project     = "Istio-MultiCluster"
+     ManagedBy   = "Terraform"
+   }
+   ```
 
 4. Initialize and apply Terraform:
    ```bash
@@ -184,3 +229,28 @@ terraform apply  # To update ArgoCD configurations
 - Monitor Azure Front Door metrics for traffic distribution
 - Use Azure Monitor for cluster health
 - Check Key Vault access logs for security monitoring
+
+## Troubleshooting
+
+### Common Issues
+
+1. **ArgoCD Repository Connection**
+   - Verify PAT token is correctly stored in Key Vault
+   - Check ArgoCD logs for authentication errors
+   - Ensure repository URL is correct
+
+2. **Traffic Distribution**
+   - Check Front Door health probe status
+   - Verify Istio gateway pods are running
+   - Check gateway service LoadBalancer status
+
+3. **Cluster Access**
+   - Verify kubeconfig paths are correct
+   - Check AKS cluster status
+   - Ensure proper RBAC permissions
+
+### Getting Help
+- Check ArgoCD logs: `kubectl logs -n argocd deploy/argocd-server`
+- Check Istio logs: `kubectl logs -n istio-system deploy/istiod`
+- Review Azure Front Door metrics in Azure Portal
+- Open an issue in the repository for support
