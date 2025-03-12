@@ -63,22 +63,65 @@ provider "helm" {
   }
 }
 
-# Kubernetes provider for UK South
+# Configure Kubernetes Providers
 provider "kubernetes" {
   alias                  = "uksouth"
-  host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
+  host                   = data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].host
+  client_certificate     = base64decode(data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].client_certificate)
+  client_key             = base64decode(data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].cluster_ca_certificate)
+
+  depends_on = [
+    azurerm_kubernetes_cluster.aks_uksouth
+  ]
 }
 
-# Kubernetes provider for UK West
 provider "kubernetes" {
   alias                  = "ukwest"
-  host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
+  host                   = data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].host
+  client_certificate     = base64decode(data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].client_certificate)
+  client_key             = base64decode(data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].cluster_ca_certificate)
+
+  depends_on = [
+    azurerm_kubernetes_cluster.aks_ukwest
+  ]
+}
+
+# Data sources for existing AKS clusters
+data "azurerm_kubernetes_cluster" "aks_uksouth" {
+  name                = azurerm_kubernetes_cluster.aks_uksouth.name
+  resource_group_name = var.aks_resource_group_name
+  depends_on         = [azurerm_kubernetes_cluster.aks_uksouth]
+}
+
+data "azurerm_kubernetes_cluster" "aks_ukwest" {
+  name                = azurerm_kubernetes_cluster.aks_ukwest.name
+  resource_group_name = var.aks_resource_group_name
+  depends_on         = [azurerm_kubernetes_cluster.aks_ukwest]
+}
+
+# Data sources for Istio Gateway services
+data "kubernetes_service" "istio_gateway_uksouth" {
+  provider = kubernetes.uksouth
+  metadata {
+    name      = "istio-gateway"
+    namespace = "istio-system"
+  }
+  depends_on = [
+    helm_release.istio_gateway_uksouth
+  ]
+}
+
+data "kubernetes_service" "istio_gateway_ukwest" {
+  provider = kubernetes.ukwest
+  metadata {
+    name      = "istio-gateway"
+    namespace = "istio-system"
+  }
+  depends_on = [
+    helm_release.istio_gateway_ukwest
+  ]
 }
 
 # Create Resource Group
@@ -101,23 +144,6 @@ resource "azurerm_cdn_frontdoor_endpoint" "endpoint" {
   name                     = var.frontdoor_endpoint_name
   cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.profile.id
   tags                     = var.tags
-}
-
-# Get Istio Gateway Service IPs
-data "kubernetes_service" "istio_gateway_uksouth" {
-  provider = kubernetes.uksouth
-  metadata {
-    name      = "istio-gateway"
-    namespace = "istio-system"
-  }
-}
-
-data "kubernetes_service" "istio_gateway_ukwest" {
-  provider = kubernetes.ukwest
-  metadata {
-    name      = "istio-gateway"
-    namespace = "istio-system"
-  }
 }
 
 # Create Front Door Origin Group
@@ -423,15 +449,15 @@ output "traffic_test_instructions" {
   EOT
 }
 
-# Create ArgoCD repository configuration for UK South
+# ArgoCD Repository Configuration for UK South
 resource "kubernetes_manifest" "argocd_repo_uksouth" {
   provider = kubernetes.uksouth
   manifest = {
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
-      name      = "repo-config"
-      namespace = kubernetes_namespace.argocd_uksouth.metadata[0].name
+      name      = "repo-secret"
+      namespace = "argocd"
       labels = {
         "argocd.argoproj.io/secret-type" = "repository"
       }
@@ -443,18 +469,21 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
       password = data.azurerm_key_vault_secret.git_pat.value
     }
   }
-  depends_on = [helm_release.argocd_uksouth]
+  depends_on = [
+    helm_release.argocd_uksouth,
+    azurerm_kubernetes_cluster.aks_uksouth
+  ]
 }
 
-# Create ArgoCD repository configuration for UK West
+# ArgoCD Repository Configuration for UK West
 resource "kubernetes_manifest" "argocd_repo_ukwest" {
   provider = kubernetes.ukwest
   manifest = {
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
-      name      = "repo-config"
-      namespace = kubernetes_namespace.argocd_ukwest.metadata[0].name
+      name      = "repo-secret"
+      namespace = "argocd"
       labels = {
         "argocd.argoproj.io/secret-type" = "repository"
       }
@@ -466,10 +495,13 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
       password = data.azurerm_key_vault_secret.git_pat.value
     }
   }
-  depends_on = [helm_release.argocd_ukwest]
+  depends_on = [
+    helm_release.argocd_ukwest,
+    azurerm_kubernetes_cluster.aks_ukwest
+  ]
 }
 
-# Create ArgoCD project for UK South
+# ArgoCD Project Configuration for UK South
 resource "kubernetes_manifest" "argocd_project_uksouth" {
   provider = kubernetes.uksouth
   manifest = {
@@ -477,7 +509,7 @@ resource "kubernetes_manifest" "argocd_project_uksouth" {
     kind       = "AppProject"
     metadata = {
       name      = "istio-system"
-      namespace = kubernetes_namespace.argocd_uksouth.metadata[0].name
+      namespace = "argocd"
     }
     spec = {
       description = "Project for Istio components"
@@ -496,10 +528,12 @@ resource "kubernetes_manifest" "argocd_project_uksouth" {
       ]
     }
   }
-  depends_on = [helm_release.argocd_uksouth]
+  depends_on = [
+    kubernetes_manifest.argocd_repo_uksouth
+  ]
 }
 
-# Create ArgoCD project for UK West
+# ArgoCD Project Configuration for UK West
 resource "kubernetes_manifest" "argocd_project_ukwest" {
   provider = kubernetes.ukwest
   manifest = {
@@ -507,7 +541,7 @@ resource "kubernetes_manifest" "argocd_project_ukwest" {
     kind       = "AppProject"
     metadata = {
       name      = "istio-system"
-      namespace = kubernetes_namespace.argocd_ukwest.metadata[0].name
+      namespace = "argocd"
     }
     spec = {
       description = "Project for Istio components"
@@ -526,7 +560,9 @@ resource "kubernetes_manifest" "argocd_project_ukwest" {
       ]
     }
   }
-  depends_on = [helm_release.argocd_ukwest]
+  depends_on = [
+    kubernetes_manifest.argocd_repo_ukwest
+  ]
 }
 
 # Apply ApplicationSets for Istio components
