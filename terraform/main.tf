@@ -47,6 +47,12 @@ provider "kubernetes" {
   client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
   client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
   cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "kubelogin"
+    args        = ["get-token", "--login", "azurecli", "--server-id", "6dae42f8-4368-4678-94ff-3960e28e3630"]
+  }
 }
 
 provider "kubernetes" {
@@ -55,6 +61,12 @@ provider "kubernetes" {
   client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
   client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
   cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "kubelogin"
+    args        = ["get-token", "--login", "azurecli", "--server-id", "6dae42f8-4368-4678-94ff-3960e28e3630"]
+  }
 }
 
 # Configure Helm Providers
@@ -437,7 +449,8 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
   depends_on = [
     kubernetes_namespace.argocd_uksouth,
     azurerm_kubernetes_cluster.uksouth,
-    data.azurerm_key_vault_secret.git_pat_token
+    data.azurerm_key_vault_secret.git_pat_token,
+    helm_release.argocd_uksouth
   ]
 }
 
@@ -464,7 +477,8 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
   depends_on = [
     kubernetes_namespace.argocd_ukwest,
     azurerm_kubernetes_cluster.ukwest,
-    data.azurerm_key_vault_secret.git_pat_token
+    data.azurerm_key_vault_secret.git_pat_token,
+    helm_release.argocd_ukwest
   ]
 }
 
