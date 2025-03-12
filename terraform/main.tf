@@ -21,7 +21,24 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    key_vault {
+      purge_soft_delete_on_destroy    = true
+      recover_soft_deleted_key_vaults = true
+    }
+  }
+}
+
+# Get existing Key Vault
+data "azurerm_key_vault" "secrets" {
+  name                = "istio-multicluster-kv"
+  resource_group_name = "istio-secrets-rg"
+}
+
+# Get PAT token from Key Vault
+data "azurerm_key_vault_secret" "git_pat" {
+  name         = "git-pat-token"
+  key_vault_id = data.azurerm_key_vault.secrets.id
 }
 
 # Helm provider configuration for UK South cluster
@@ -420,8 +437,10 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
       }
     }
     stringData = {
-      type = "git"
-      url  = var.git_repository_url
+      type     = "git"
+      url      = var.git_repository_url
+      username = var.git_username
+      password = data.azurerm_key_vault_secret.git_pat.value
     }
   }
   depends_on = [helm_release.argocd_uksouth]
@@ -441,8 +460,10 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
       }
     }
     stringData = {
-      type = "git"
-      url  = var.git_repository_url
+      type     = "git"
+      url      = var.git_repository_url
+      username = var.git_username
+      password = data.azurerm_key_vault_secret.git_pat.value
     }
   }
   depends_on = [helm_release.argocd_ukwest]

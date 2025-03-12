@@ -36,7 +36,15 @@ istio-multicluster-argocd/
    cd istio-multicluster-argocd
    ```
 
-2. Configure Terraform:
+2. Configure Azure Key Vault:
+   ```bash
+   # First time setup: Store your PAT token in Azure Key Vault
+   az group create --name istio-secrets-rg --location uksouth
+   az keyvault create --name istio-multicluster-kv --resource-group istio-secrets-rg --location uksouth
+   az keyvault secret set --vault-name istio-multicluster-kv --name "git-pat-token" --value "YOUR-PAT-TOKEN"
+   ```
+
+3. Configure Terraform:
    ```bash
    cd terraform
    cp terraform.tfvars.example terraform.tfvars
@@ -45,10 +53,10 @@ istio-multicluster-argocd/
    - AKS cluster configurations (resource group, locations, node sizes)
    - Azure Front Door settings
    - ArgoCD Helm chart version
-   - Git repository URL (if different from default)
+   - Git repository URL
    - Resource tags
 
-3. Initialize and apply Terraform:
+4. Initialize and apply Terraform:
    ```bash
    terraform init
    terraform plan
@@ -60,10 +68,10 @@ istio-multicluster-argocd/
    - Install ArgoCD in both clusters using Helm
    - Configure Azure Front Door
    - Set up required networking and security configurations
-   - Configure ArgoCD with repository and project settings
+   - Configure ArgoCD with repository and project settings (using PAT from Key Vault)
    - Apply Istio ApplicationSets automatically
 
-4. Access ArgoCD UI:
+5. Access ArgoCD UI:
    ```bash
    # Get ArgoCD admin password for UK South cluster
    kubectl --kubeconfig ~/.kube/config-uksouth -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
@@ -79,59 +87,5 @@ istio-multicluster-argocd/
    ```
    Access the ArgoCD UI at `https://<LOAD_BALANCER_IP>` with username `admin` and the password obtained above.
 
-5. Apply ArgoCD ApplicationSets for Istio components:
-   ```bash
-   kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/istio-base.yaml
-   kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/istiod.yaml
-   kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/gateway.yaml
+6. Apply ArgoCD ApplicationSets for Istio components:
    ```
-
-## Configuration Details
-
-### AKS Clusters
-- Two AKS clusters are created in UK South and UK West regions
-- Each cluster has:
-  - Default node pool for general workloads (Standard_D4s_v3, 3 nodes)
-  - Dedicated node pool for Istio Gateway (Standard_D4s_v3, 2 nodes)
-  - Node pool labels and taints for Istio Gateway (`purpose: istio-gateway`)
-  - Managed identity for authentication
-  - Network plugin: Azure CNI
-  - Kubernetes version: 1.27.3 (configurable)
-
-### Azure Front Door
-- Standard SKU Front Door profile
-- Origin groups configured for both clusters with:
-  - Health probes every 30 seconds
-  - Session affinity enabled
-  - Equal weight distribution (50/50)
-  - Proper HTTP/HTTPS port configuration
-  - Health probe path: /healthz/ready
-
-### Istio Configuration
-- Base Istio installation via official Helm charts
-- Istiod control plane
-- Ingress gateways configured with:
-  - LoadBalancer service type
-  - HTTP (80/8080) and HTTPS (443/8443) ports
-  - Resource requests: 500m CPU, 1Gi memory
-  - Resource limits: 2000m CPU, 2Gi memory
-  - 3 replicas for high availability
-  - Node selector and tolerations for dedicated nodes
-
-### ArgoCD Installation
-- Installed via Helm chart (version 5.51.6)
-- High Availability (HA) mode enabled
-- ApplicationSet controller enabled
-- LoadBalancer service type for UI access
-- Automated sync policies with pruning and self-healing
-- Namespace creation enabled
-- Automated repository configuration:
-  - Git repository connection automatically configured
-  - Project "istio-system" created with appropriate permissions
-  - ApplicationSets automatically applied
-  - No manual repository setup required
-
-## Maintenance
-
-### Updating Kubernetes Version
-1. Update `

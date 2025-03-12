@@ -107,6 +107,12 @@ variable "git_repository_url" {
   default     = "https://github.com/kofiray/istio-multicluster-argocd.git"
 }
 
+variable "git_username" {
+  description = "Username for Git repository authentication"
+  type        = string
+  default     = "git"
+}
+
 variable "argocd_helm_version" {
   description = "Version of ArgoCD Helm chart to install"
   type        = string
