@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: istiod
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: uksouth
+            server: https://cluster1-endpoint
+            values:
+              region: uksouth
+          - name: ukwest
+            server: https://cluster2-endpoint
+            values:
+              region: ukwest
+  template:
+    metadata:
+      name: 'istiod-{{name}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://istio-release.storage.googleapis.com/charts
+        chart: istiod
+        targetRevision: 1.20.0
+        helm:
+          values: |
+            global:
+              istioNamespace: istio-system
+              meshID: mesh1
+              multiCluster:
+                clusterName: "{{name}}"
+                region: "{{values.region}}"
+              network: "network1"
+            pilot:
+              autoscaleEnabled: true
+              autoscaleMin: 2
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 2048Mi
+      destination:
+        server: '{{server}}'
+        namespace: istio-system
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true 
