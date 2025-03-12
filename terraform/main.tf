@@ -60,6 +60,27 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
 }
 
+# Configure kubectl providers
+provider "kubectl" {
+  alias = "uksouth"
+  
+  host                   = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].cluster_ca_certificate)
+  load_config_file       = false
+}
+
+provider "kubectl" {
+  alias = "ukwest"
+  
+  host                   = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
+  load_config_file       = false
+}
+
 # Helm provider configuration for UK South cluster
 provider "helm" {
   alias = "uksouth"
@@ -400,9 +421,9 @@ output "traffic_test_instructions" {
 }
 
 # ArgoCD Repository Configuration for UK South
-resource "kubernetes_manifest" "argocd_repo_uksouth" {
-  provider = kubernetes.uksouth
-  manifest = {
+resource "kubectl_manifest" "argocd_repo_uksouth" {
+  provider = kubectl.uksouth
+  yaml_body = yamlencode({
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
@@ -418,7 +439,7 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
       username = var.git_username
       password = data.azurerm_key_vault_secret.git_pat.value
     }
-  }
+  })
   depends_on = [
     helm_release.argocd_uksouth,
     kubernetes_namespace.argocd_uksouth
@@ -426,9 +447,9 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
 }
 
 # ArgoCD Repository Configuration for UK West
-resource "kubernetes_manifest" "argocd_repo_ukwest" {
-  provider = kubernetes.ukwest
-  manifest = {
+resource "kubectl_manifest" "argocd_repo_ukwest" {
+  provider = kubectl.ukwest
+  yaml_body = yamlencode({
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
@@ -444,7 +465,7 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
       username = var.git_username
       password = data.azurerm_key_vault_secret.git_pat.value
     }
-  }
+  })
   depends_on = [
     helm_release.argocd_ukwest,
     kubernetes_namespace.argocd_ukwest
@@ -452,9 +473,9 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
 }
 
 # ArgoCD Project Configuration for UK South
-resource "kubernetes_manifest" "argocd_project_uksouth" {
-  provider = kubernetes.uksouth
-  manifest = {
+resource "kubectl_manifest" "argocd_project_uksouth" {
+  provider = kubectl.uksouth
+  yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "AppProject"
     metadata = {
@@ -477,17 +498,17 @@ resource "kubernetes_manifest" "argocd_project_uksouth" {
         }
       ]
     }
-  }
+  })
   depends_on = [
-    kubernetes_manifest.argocd_repo_uksouth,
+    kubectl_manifest.argocd_repo_uksouth,
     helm_release.argocd_uksouth
   ]
 }
 
 # ArgoCD Project Configuration for UK West
-resource "kubernetes_manifest" "argocd_project_ukwest" {
-  provider = kubernetes.ukwest
-  manifest = {
+resource "kubectl_manifest" "argocd_project_ukwest" {
+  provider = kubectl.ukwest
+  yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "AppProject"
     metadata = {
@@ -510,28 +531,28 @@ resource "kubernetes_manifest" "argocd_project_ukwest" {
         }
       ]
     }
-  }
+  })
   depends_on = [
-    kubernetes_manifest.argocd_repo_ukwest,
+    kubectl_manifest.argocd_repo_ukwest,
     helm_release.argocd_ukwest
   ]
 }
 
 # Apply ApplicationSets for Istio components
-resource "kubernetes_manifest" "istio_applicationsets" {
-  provider = kubernetes.uksouth
+resource "kubectl_manifest" "istio_applicationsets" {
+  provider = kubectl.uksouth
   for_each = {
     base    = file("${path.module}/../applicationsets/istio-base.yaml")
     istiod  = file("${path.module}/../applicationsets/istiod.yaml")
     gateway = file("${path.module}/../applicationsets/gateway.yaml")
   }
 
-  manifest = yamldecode(each.value)
+  yaml_body = each.value
 
   depends_on = [
-    kubernetes_manifest.argocd_project_uksouth,
-    kubernetes_manifest.argocd_project_ukwest,
-    kubernetes_manifest.argocd_repo_uksouth,
-    kubernetes_manifest.argocd_repo_ukwest
+    kubectl_manifest.argocd_project_uksouth,
+    kubectl_manifest.argocd_project_ukwest,
+    kubectl_manifest.argocd_repo_uksouth,
+    kubectl_manifest.argocd_repo_ukwest
   ]
 } 
