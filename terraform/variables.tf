@@ -1,3 +1,38 @@
+variable "aks_resource_group_name" {
+  description = "Name of the resource group for AKS clusters"
+  type        = string
+}
+
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for AKS clusters"
+  type        = string
+  default     = "1.27.3"
+}
+
+variable "node_count" {
+  description = "Number of nodes in the default node pool"
+  type        = number
+  default     = 3
+}
+
+variable "vm_size" {
+  description = "Size of VMs in the default node pool"
+  type        = string
+  default     = "Standard_D4s_v3"
+}
+
+variable "gateway_vm_size" {
+  description = "Size of VMs in the gateway node pool"
+  type        = string
+  default     = "Standard_D4s_v3"
+}
+
+variable "gateway_node_count" {
+  description = "Number of nodes in the gateway node pool"
+  type        = number
+  default     = 2
+}
+
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string

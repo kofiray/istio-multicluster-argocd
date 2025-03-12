@@ -1,18 +1,19 @@
-# Istio Multi-Cluster with Azure Front Door
+# Istio Multi-Cluster with ArgoCD and Azure Front Door
 
-This repository contains the configuration for managing Istio across multiple clusters using ArgoCD ApplicationSets and Azure Front Door for traffic distribution.
+This repository contains the configuration for managing Istio across multiple AKS clusters using ArgoCD and Azure Front Door for traffic distribution.
 
-## Architecture
+## Prerequisites
 
-- Two Kubernetes clusters (UK South and UK West)
-- Istio service mesh deployed on both clusters
-- Azure Front Door for traffic distribution and load balancing
-- ArgoCD for GitOps-based deployment and management
+- Azure CLI installed and configured
+- Terraform v1.0.0 or later
+- kubectl installed
+- ArgoCD installed in your clusters
+- Azure subscription with necessary permissions
 
-## Directory Structure
+## Repository Structure
 
 ```
-.
+istio-multicluster-argocd/
 ├── applicationsets/
 │   ├── istio-base.yaml
 │   ├── istiod.yaml
@@ -20,77 +21,127 @@ This repository contains the configuration for managing Istio across multiple cl
 ├── terraform/
 │   ├── main.tf
 │   ├── variables.tf
+│   ├── aks-clusters.tf
 │   └── terraform.tfvars
+├── .gitignore
 └── README.md
 ```
 
-## Prerequisites
-
-1. Two Kubernetes clusters (UK South and UK West)
-2. ArgoCD installed on both clusters
-3. Azure subscription with permissions to create Front Door resources
-4. Kubeconfig files for both clusters
-
 ## Setup Instructions
 
-1. Update Terraform Variables:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/kofiray/istio-multicluster-argocd.git
+   cd istio-multicluster-argocd
+   ```
+
+2. Configure Terraform:
    ```bash
    cd terraform
    cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your values
    ```
+   Edit `terraform.tfvars` with your specific values.
 
-2. Initialize and Apply Terraform:
+3. Initialize and apply Terraform to create AKS clusters and Front Door:
    ```bash
    terraform init
    terraform plan
    terraform apply
    ```
+   This will create:
+   - Two AKS clusters (UK South and UK West)
+   - Azure Front Door profile
+   - Required networking and security configurations
 
-3. Apply ArgoCD ApplicationSets:
+4. Get kubeconfig for both clusters:
    ```bash
-   kubectl apply -f applicationsets/istio-base.yaml
-   kubectl apply -f applicationsets/istiod.yaml
-   kubectl apply -f applicationsets/gateway.yaml
+   az aks get-credentials --resource-group aks-istio-rg --name aks-uksouth --file ~/.kube/config-uksouth
+   az aks get-credentials --resource-group aks-istio-rg --name aks-ukwest --file ~/.kube/config-ukwest
    ```
 
-4. Verify Installation:
+5. Install ArgoCD in both clusters:
    ```bash
-   # Check Istio components in UK South
-   kubectl --context=uksouth -n istio-system get pods
-
-   # Check Istio components in UK West
-   kubectl --context=ukwest -n istio-system get pods
+   kubectl --kubeconfig ~/.kube/config-uksouth create namespace argocd
+   kubectl --kubeconfig ~/.kube/config-uksouth apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+   
+   kubectl --kubeconfig ~/.kube/config-ukwest create namespace argocd
+   kubectl --kubeconfig ~/.kube/config-ukwest apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
    ```
 
-## Traffic Distribution
+6. Apply ArgoCD ApplicationSets for Istio components:
+   ```bash
+   kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/istio-base.yaml
+   kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/istiod.yaml
+   kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/gateway.yaml
+   ```
 
-Azure Front Door is configured to distribute traffic between the UK South and UK West clusters with:
-- Equal weight distribution (50/50)
-- Health probes every 30 seconds
-- Session affinity enabled
-- Automatic failover if a cluster becomes unhealthy
+7. Verify the setup:
+   ```bash
+   # Check Istio pods in both clusters
+   kubectl --kubeconfig ~/.kube/config-uksouth get pods -n istio-system
+   kubectl --kubeconfig ~/.kube/config-ukwest get pods -n istio-system
+   
+   # Check Front Door endpoint
+   az network front-door endpoint show \
+     --resource-group istio-frontdoor-rg \
+     --profile-name istio-frontdoor \
+     --endpoint-name istio-app
+   ```
 
-## Monitoring
+## Configuration Details
 
-Monitor the setup using:
-1. Azure Front Door metrics in Azure Portal
-2. Istio's built-in monitoring with Prometheus and Grafana
-3. ArgoCD dashboard for deployment status
+### AKS Clusters
+- Two AKS clusters are created in UK South and UK West regions
+- Each cluster has:
+  - Default node pool for general workloads
+  - Dedicated node pool for Istio Gateway with appropriate taints/tolerations
+  - Managed identity for authentication
+  - Network plugin: Azure CNI
+  - Kubernetes version: 1.27.3 (configurable)
+
+### Azure Front Door
+- Standard SKU Front Door profile
+- Origin groups configured for both clusters
+- Health probes and load balancing rules
+- Custom routing rules for traffic distribution
+
+### Istio Configuration
+- Base Istio installation
+- Istiod control plane
+- Ingress gateways with Azure Front Door integration
+
+## Maintenance
+
+### Updating Kubernetes Version
+1. Update `kubernetes_version` in terraform.tfvars
+2. Run `terraform plan` and `terraform apply`
+
+### Adding New Clusters
+1. Add new cluster configuration in aks-clusters.tf
+2. Add corresponding Front Door origin in main.tf
+3. Update ApplicationSets to include new cluster
 
 ## Troubleshooting
 
-1. Check ArgoCD application status:
+1. Check cluster health:
    ```bash
-   kubectl get applications -n argocd
+   az aks show -g aks-istio-rg -n aks-uksouth --query 'provisioningState'
+   az aks show -g aks-istio-rg -n aks-ukwest --query 'provisioningState'
    ```
 
-2. Check Istio pods:
+2. Verify Istio installation:
    ```bash
-   kubectl get pods -n istio-system
+   istioctl verify-install --kubeconfig ~/.kube/config-uksouth
+   istioctl verify-install --kubeconfig ~/.kube/config-ukwest
    ```
 
-3. Check Azure Front Door health probe status in Azure Portal
+3. Check Front Door routing:
+   ```bash
+   az network front-door route show \
+     --resource-group istio-frontdoor-rg \
+     --profile-name istio-frontdoor \
+     --name istio-route
+   ```
 
 ## Contributing
 
