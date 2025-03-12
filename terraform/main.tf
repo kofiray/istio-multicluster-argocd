@@ -29,78 +29,72 @@ provider "azurerm" {
   }
 }
 
-# Get existing Key Vault
-data "azurerm_key_vault" "secrets" {
+# Azure Key Vault data source
+data "azurerm_key_vault" "kv" {
   name                = "istio-multicluster-kv"
   resource_group_name = "istio-secrets-rg"
 }
 
-# Get PAT token from Key Vault
-data "azurerm_key_vault_secret" "git_pat" {
+data "azurerm_key_vault_secret" "git_pat_token" {
   name         = "git-pat-token"
-  key_vault_id = data.azurerm_key_vault.secrets.id
+  key_vault_id = data.azurerm_key_vault.kv.id
 }
 
 # Configure Kubernetes Providers
 provider "kubernetes" {
   alias = "uksouth"
-  
-  host = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
 }
 
 provider "kubernetes" {
   alias = "ukwest"
-  
-  host = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
 }
 
-# Configure kubectl providers
+# Configure Helm Providers
+provider "helm" {
+  alias = "uksouth"
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
+  }
+}
+
+provider "helm" {
+  alias = "ukwest"
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
+  }
+}
+
+# Configure kubectl Providers
 provider "kubectl" {
   alias = "uksouth"
-  
-  host                   = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
   load_config_file       = false
 }
 
 provider "kubectl" {
   alias = "ukwest"
-  
-  host                   = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
   load_config_file       = false
-}
-
-# Helm provider configuration for UK South cluster
-provider "helm" {
-  alias = "uksouth"
-  kubernetes {
-    host = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].cluster_ca_certificate)
-  }
-}
-
-# Helm provider configuration for UK West cluster
-provider "helm" {
-  alias = "ukwest"
-  kubernetes {
-    host = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
-  }
 }
 
 # Create Resource Group
@@ -421,9 +415,9 @@ output "traffic_test_instructions" {
 }
 
 # ArgoCD Repository Configuration for UK South
-resource "kubectl_manifest" "argocd_repo_uksouth" {
-  provider = kubectl.uksouth
-  yaml_body = yamlencode({
+resource "kubernetes_manifest" "argocd_repo_uksouth" {
+  provider = kubernetes.uksouth
+  manifest = {
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
@@ -437,19 +431,20 @@ resource "kubectl_manifest" "argocd_repo_uksouth" {
       type     = "git"
       url      = var.git_repository_url
       username = var.git_username
-      password = data.azurerm_key_vault_secret.git_pat.value
+      password = data.azurerm_key_vault_secret.git_pat_token.value
     }
-  })
+  }
   depends_on = [
-    helm_release.argocd_uksouth,
-    kubernetes_namespace.argocd_uksouth
+    kubernetes_namespace.argocd_uksouth,
+    azurerm_kubernetes_cluster.uksouth,
+    data.azurerm_key_vault_secret.git_pat_token
   ]
 }
 
 # ArgoCD Repository Configuration for UK West
-resource "kubectl_manifest" "argocd_repo_ukwest" {
-  provider = kubectl.ukwest
-  yaml_body = yamlencode({
+resource "kubernetes_manifest" "argocd_repo_ukwest" {
+  provider = kubernetes.ukwest
+  manifest = {
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
@@ -463,12 +458,13 @@ resource "kubectl_manifest" "argocd_repo_ukwest" {
       type     = "git"
       url      = var.git_repository_url
       username = var.git_username
-      password = data.azurerm_key_vault_secret.git_pat.value
+      password = data.azurerm_key_vault_secret.git_pat_token.value
     }
-  })
+  }
   depends_on = [
-    helm_release.argocd_ukwest,
-    kubernetes_namespace.argocd_ukwest
+    kubernetes_namespace.argocd_ukwest,
+    azurerm_kubernetes_cluster.ukwest,
+    data.azurerm_key_vault_secret.git_pat_token
   ]
 }
 

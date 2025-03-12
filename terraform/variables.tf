@@ -6,25 +6,25 @@ variable "aks_resource_group_name" {
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use for AKS clusters"
   type        = string
-  default     = "1.27.3"
+  default     = "1.29.13"
 }
 
 variable "node_count" {
   description = "Number of nodes in the default node pool"
   type        = number
-  default     = 3
+  default     = 2
 }
 
 variable "vm_size" {
   description = "Size of VMs in the default node pool"
   type        = string
-  default     = "Standard_D4s_v3"
+  default     = "Standard_DS2_v2"
 }
 
 variable "gateway_vm_size" {
   description = "Size of VMs in the gateway node pool"
   type        = string
-  default     = "Standard_D4s_v3"
+  default     = "Standard_DS2_v2"
 }
 
 variable "gateway_node_count" {

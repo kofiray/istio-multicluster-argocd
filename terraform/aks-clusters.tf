@@ -10,6 +10,7 @@ resource "azurerm_kubernetes_cluster" "uksouth" {
   resource_group_name = azurerm_resource_group.aks_rg.name
   dns_prefix         = "aks-uksouth"
   kubernetes_version = var.kubernetes_version
+  sku_tier           = "Free"
 
   default_node_pool {
     name            = "default"
@@ -38,13 +39,13 @@ resource "azurerm_kubernetes_cluster" "ukwest" {
   resource_group_name = azurerm_resource_group.aks_rg.name
   dns_prefix         = "aks-ukwest"
   kubernetes_version = var.kubernetes_version
+  sku_tier           = "Free"
 
   default_node_pool {
     name            = "default"
     node_count      = var.node_count
     vm_size         = var.vm_size
     os_disk_size_gb = 50
-    zones           = ["1", "2", "3"]
   }
 
   identity {
@@ -84,7 +85,6 @@ resource "azurerm_kubernetes_cluster_node_pool" "ukwest_gateway" {
   kubernetes_cluster_id = azurerm_kubernetes_cluster.ukwest.id
   vm_size              = var.gateway_vm_size
   node_count           = var.gateway_node_count
-  zones                = ["1", "2", "3"]
 
   node_labels = {
     "purpose" = "istio-gateway"
@@ -106,4 +106,4 @@ output "uksouth_kube_config" {
 output "ukwest_kube_config" {
   value     = azurerm_kubernetes_cluster.ukwest.kube_config_raw
   sensitive = true
-} 
+}
