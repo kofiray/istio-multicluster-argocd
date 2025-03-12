@@ -548,7 +548,7 @@ resource "kubectl_manifest" "istio_applicationsets" {
   depends_on = [
     kubectl_manifest.argocd_project_uksouth,
     kubectl_manifest.argocd_project_ukwest,
-    kubectl_manifest.argocd_repo_uksouth,
-    kubectl_manifest.argocd_repo_ukwest
+    kubernetes_manifest.argocd_repo_uksouth,
+    kubernetes_manifest.argocd_repo_ukwest
   ]
 } 
