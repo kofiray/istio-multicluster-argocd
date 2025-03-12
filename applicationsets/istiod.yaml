@@ -8,18 +8,18 @@ spec:
     - list:
         elements:
           - name: uksouth
-            server: https://cluster1-endpoint
+            server: https://kubernetes.default.svc
             values:
               region: uksouth
           - name: ukwest
-            server: https://cluster2-endpoint
+            server: https://kubernetes.default.svc
             values:
               region: ukwest
   template:
     metadata:
       name: 'istiod-{{name}}'
     spec:
-      project: default
+      project: istio-system
       source:
         repoURL: https://istio-release.storage.googleapis.com/charts
         chart: istiod
