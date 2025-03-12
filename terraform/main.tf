@@ -496,7 +496,7 @@ resource "kubectl_manifest" "argocd_project_uksouth" {
     }
   })
   depends_on = [
-    kubectl_manifest.argocd_repo_uksouth,
+    kubernetes_manifest.argocd_repo_uksouth,
     helm_release.argocd_uksouth
   ]
 }
@@ -529,7 +529,7 @@ resource "kubectl_manifest" "argocd_project_ukwest" {
     }
   })
   depends_on = [
-    kubectl_manifest.argocd_repo_ukwest,
+    kubernetes_manifest.argocd_repo_ukwest,
     helm_release.argocd_ukwest
   ]
 }
