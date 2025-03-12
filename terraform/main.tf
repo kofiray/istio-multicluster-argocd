@@ -404,4 +404,125 @@ output "traffic_test_instructions" {
          sleep 0.2;
        done | sort | uniq -c
   EOT
+}
+
+# Create ArgoCD repository configuration for UK South
+resource "kubernetes_manifest" "argocd_repo_uksouth" {
+  provider = kubernetes.uksouth
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Secret"
+    metadata = {
+      name      = "repo-config"
+      namespace = kubernetes_namespace.argocd_uksouth.metadata[0].name
+      labels = {
+        "argocd.argoproj.io/secret-type" = "repository"
+      }
+    }
+    stringData = {
+      type = "git"
+      url  = var.git_repository_url
+    }
+  }
+  depends_on = [helm_release.argocd_uksouth]
+}
+
+# Create ArgoCD repository configuration for UK West
+resource "kubernetes_manifest" "argocd_repo_ukwest" {
+  provider = kubernetes.ukwest
+  manifest = {
+    apiVersion = "v1"
+    kind       = "Secret"
+    metadata = {
+      name      = "repo-config"
+      namespace = kubernetes_namespace.argocd_ukwest.metadata[0].name
+      labels = {
+        "argocd.argoproj.io/secret-type" = "repository"
+      }
+    }
+    stringData = {
+      type = "git"
+      url  = var.git_repository_url
+    }
+  }
+  depends_on = [helm_release.argocd_ukwest]
+}
+
+# Create ArgoCD project for UK South
+resource "kubernetes_manifest" "argocd_project_uksouth" {
+  provider = kubernetes.uksouth
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "istio-system"
+      namespace = kubernetes_namespace.argocd_uksouth.metadata[0].name
+    }
+    spec = {
+      description = "Project for Istio components"
+      sourceRepos = [var.git_repository_url]
+      destinations = [
+        {
+          namespace = "istio-system"
+          server    = "https://kubernetes.default.svc"
+        }
+      ]
+      clusterResourceWhitelist = [
+        {
+          group = "*"
+          kind  = "*"
+        }
+      ]
+    }
+  }
+  depends_on = [helm_release.argocd_uksouth]
+}
+
+# Create ArgoCD project for UK West
+resource "kubernetes_manifest" "argocd_project_ukwest" {
+  provider = kubernetes.ukwest
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "AppProject"
+    metadata = {
+      name      = "istio-system"
+      namespace = kubernetes_namespace.argocd_ukwest.metadata[0].name
+    }
+    spec = {
+      description = "Project for Istio components"
+      sourceRepos = [var.git_repository_url]
+      destinations = [
+        {
+          namespace = "istio-system"
+          server    = "https://kubernetes.default.svc"
+        }
+      ]
+      clusterResourceWhitelist = [
+        {
+          group = "*"
+          kind  = "*"
+        }
+      ]
+    }
+  }
+  depends_on = [helm_release.argocd_ukwest]
+}
+
+# Apply ApplicationSets for Istio components
+resource "kubernetes_manifest" "istio_applicationsets" {
+  provider = kubernetes.uksouth
+  for_each = {
+    base    = file("${path.module}/../applicationsets/istio-base.yaml")
+    istiod  = file("${path.module}/../applicationsets/istiod.yaml")
+    gateway = file("${path.module}/../applicationsets/gateway.yaml")
+  }
+
+  manifest = yamldecode(each.value)
+
+  depends_on = [
+    kubernetes_manifest.argocd_project_uksouth,
+    kubernetes_manifest.argocd_project_ukwest,
+    kubernetes_manifest.argocd_repo_uksouth,
+    kubernetes_manifest.argocd_repo_ukwest
+  ]
 } 

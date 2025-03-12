@@ -101,8 +101,14 @@ variable "ukwest_kubeconfig_path" {
   type        = string
 }
 
-variable "argocd_helm_version" {
-  description = "Version of the ArgoCD Helm chart to install"
+variable "git_repository_url" {
+  description = "URL of the Git repository containing Istio configurations"
   type        = string
-  default     = "5.51.6"  # Latest stable version as of now
+  default     = "https://github.com/kofiray/istio-multicluster-argocd.git"
+}
+
+variable "argocd_helm_version" {
+  description = "Version of ArgoCD Helm chart to install"
+  type        = string
+  default     = "5.51.6"
 } 

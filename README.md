@@ -45,6 +45,7 @@ istio-multicluster-argocd/
    - AKS cluster configurations (resource group, locations, node sizes)
    - Azure Front Door settings
    - ArgoCD Helm chart version
+   - Git repository URL (if different from default)
    - Resource tags
 
 3. Initialize and apply Terraform:
@@ -59,6 +60,8 @@ istio-multicluster-argocd/
    - Install ArgoCD in both clusters using Helm
    - Configure Azure Front Door
    - Set up required networking and security configurations
+   - Configure ArgoCD with repository and project settings
+   - Apply Istio ApplicationSets automatically
 
 4. Access ArgoCD UI:
    ```bash
@@ -122,103 +125,13 @@ istio-multicluster-argocd/
 - LoadBalancer service type for UI access
 - Automated sync policies with pruning and self-healing
 - Namespace creation enabled
+- Automated repository configuration:
+  - Git repository connection automatically configured
+  - Project "istio-system" created with appropriate permissions
+  - ApplicationSets automatically applied
+  - No manual repository setup required
 
 ## Maintenance
 
 ### Updating Kubernetes Version
-1. Update `kubernetes_version` in `terraform.tfvars`
-2. Run `terraform plan` and `terraform apply`
-3. Verify cluster health after upgrade
-
-### Updating Istio Version
-1. Update `targetRevision` in `applicationsets/gateway.yaml`
-2. Commit and push changes
-3. ArgoCD will automatically sync the new version
-
-### Updating ArgoCD Version
-1. Update `argocd_helm_chart_version` in `terraform.tfvars`
-2. Run `terraform plan` and `terraform apply`
-
-### Monitoring Health
-1. Check Azure Front Door metrics in Azure Portal
-2. Monitor Istio Gateway pods:
-   ```bash
-   kubectl --kubeconfig ~/.kube/config-uksouth -n istio-system get pods
-   kubectl --kubeconfig ~/.kube/config-ukwest -n istio-system get pods
-   ```
-3. Verify ArgoCD applications status in UI or CLI:
-   ```bash
-   kubectl --kubeconfig ~/.kube/config-uksouth -n argocd get applications
-   ```
-
-## Security Considerations
-
-1. ArgoCD is exposed via LoadBalancer - consider implementing ingress with TLS
-2. Update ArgoCD admin password after initial setup
-3. Review and adjust RBAC permissions as needed
-4. Consider enabling network policies
-5. Regularly update all components to latest stable versions
-
-## Troubleshooting
-
-### Common Issues
-
-1. ArgoCD sync failures:
-   - Check application logs
-   - Verify cluster credentials
-   - Check network connectivity
-
-2. Traffic distribution issues:
-   - Verify Azure Front Door health probe status
-   - Check Istio Gateway pods are running
-   - Verify service endpoints are correctly configured
-
-3. Node pool issues:
-   - Verify node labels and taints
-   - Check resource quotas
-   - Monitor node health
-
-For more detailed troubleshooting, check the logs:
-```bash
-# Istio Gateway logs
-kubectl --kubeconfig ~/.kube/config-uksouth -n istio-system logs -l app=istio-ingressgateway
-
-# ArgoCD logs
-kubectl --kubeconfig ~/.kube/config-uksouth -n argocd logs -l app.kubernetes.io/name=argocd-server
-```
-
-## Traffic Distribution Testing
-
-After deployment, you can verify the traffic distribution between clusters:
-
-1. Wait for all resources to be deployed (5-10 minutes)
-
-2. Run the automated test script:
-   ```bash
-   kubectl --kubeconfig ~/.kube/config-uksouth exec -it -n traffic-test traffic-test-runner -- /tmp/test-distribution.sh
-   ```
-   This will make 100 requests and show the distribution between clusters.
-
-3. For manual testing, you can use this command:
-   ```bash
-   for i in {1..100}; do 
-     curl -s https://<FRONT_DOOR_ENDPOINT>/traffic-test | grep -o "UK [A-Z]*" || echo "Error";
-     sleep 0.2;
-   done | sort | uniq -c
-   ```
-
-The traffic distribution should be approximately 50/50 between UK South and UK West clusters, with some variation due to the load balancing algorithm.
-
-### Expected Results
-- Approximately equal distribution between clusters (within 10% deviation)
-- Low error rate (< 1%)
-- Consistent response times
-- Session affinity maintained for subsequent requests from the same client
-
-### Troubleshooting Distribution Issues
-If the distribution is significantly uneven:
-1. Check health probe status in Azure Portal
-2. Verify Istio Gateway pods are running in both clusters
-3. Check Gateway service endpoints are correctly configured
-4. Review Front Door origin group settings
-5. Verify no rate limiting is affecting the test
+1. Update `
