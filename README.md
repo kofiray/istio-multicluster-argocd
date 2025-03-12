@@ -186,3 +186,39 @@ kubectl --kubeconfig ~/.kube/config-uksouth -n istio-system logs -l app=istio-in
 # ArgoCD logs
 kubectl --kubeconfig ~/.kube/config-uksouth -n argocd logs -l app.kubernetes.io/name=argocd-server
 ```
+
+## Traffic Distribution Testing
+
+After deployment, you can verify the traffic distribution between clusters:
+
+1. Wait for all resources to be deployed (5-10 minutes)
+
+2. Run the automated test script:
+   ```bash
+   kubectl --kubeconfig ~/.kube/config-uksouth exec -it -n traffic-test traffic-test-runner -- /tmp/test-distribution.sh
+   ```
+   This will make 100 requests and show the distribution between clusters.
+
+3. For manual testing, you can use this command:
+   ```bash
+   for i in {1..100}; do 
+     curl -s https://<FRONT_DOOR_ENDPOINT>/traffic-test | grep -o "UK [A-Z]*" || echo "Error";
+     sleep 0.2;
+   done | sort | uniq -c
+   ```
+
+The traffic distribution should be approximately 50/50 between UK South and UK West clusters, with some variation due to the load balancing algorithm.
+
+### Expected Results
+- Approximately equal distribution between clusters (within 10% deviation)
+- Low error rate (< 1%)
+- Consistent response times
+- Session affinity maintained for subsequent requests from the same client
+
+### Troubleshooting Distribution Issues
+If the distribution is significantly uneven:
+1. Check health probe status in Azure Portal
+2. Verify Istio Gateway pods are running in both clusters
+3. Check Gateway service endpoints are correctly configured
+4. Review Front Door origin group settings
+5. Verify no rate limiting is affecting the test

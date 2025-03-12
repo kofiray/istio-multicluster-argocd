@@ -266,4 +266,142 @@ resource "helm_release" "argocd_ukwest" {
       }
     })
   ]
+}
+
+# Create namespace for traffic test in UK South
+resource "kubernetes_namespace" "traffic_test_uksouth" {
+  provider = kubernetes.uksouth
+  metadata {
+    name = "traffic-test"
+  }
+}
+
+# Create namespace for traffic test in UK West
+resource "kubernetes_namespace" "traffic_test_ukwest" {
+  provider = kubernetes.ukwest
+  metadata {
+    name = "traffic-test"
+  }
+}
+
+# Create traffic test ConfigMap
+resource "kubernetes_config_map" "traffic_test_script" {
+  provider = kubernetes.uksouth
+  metadata {
+    name      = "traffic-test-script"
+    namespace = kubernetes_namespace.traffic_test_uksouth.metadata[0].name
+  }
+
+  data = {
+    "test-distribution.sh" = <<-EOF
+    #!/bin/bash
+    
+    # Traffic distribution test script
+    FRONT_DOOR_ENDPOINT="${azurerm_cdn_frontdoor_endpoint.endpoint.host_name}"
+    TEST_PATH="/traffic-test"
+    NUM_REQUESTS=100
+    
+    echo "Testing traffic distribution between UK South and UK West clusters"
+    echo "Front Door Endpoint: $FRONT_DOOR_ENDPOINT"
+    echo "Test Path: $TEST_PATH"
+    echo "Number of Requests: $NUM_REQUESTS"
+    echo ""
+    
+    # Initialize counters
+    uk_south_count=0
+    uk_west_count=0
+    error_count=0
+    
+    # Make requests and count responses
+    for ((i=1; i<=$NUM_REQUESTS; i++)); do
+      # Generate random values for headers
+      random_ip="$((RANDOM % 256)).$((RANDOM % 256)).$((RANDOM % 256)).$((RANDOM % 256))"
+      random_user_agent="Mozilla/5.0 (Test-$RANDOM)"
+      
+      # Make request with random headers
+      response=$(curl -s \
+        -H "Cache-Control: no-cache, no-store, must-revalidate" \
+        -H "Pragma: no-cache" \
+        -H "X-Forwarded-For: $random_ip" \
+        -H "User-Agent: $random_user_agent" \
+        "https://$FRONT_DOOR_ENDPOINT$TEST_PATH")
+      
+      if echo "$response" | grep -q "UK SOUTH"; then
+        uk_south_count=$((uk_south_count + 1))
+        echo -n "S"
+      elif echo "$response" | grep -q "UK WEST"; then
+        uk_west_count=$((uk_west_count + 1))
+        echo -n "W"
+      else
+        error_count=$((error_count + 1))
+        echo -n "?"
+      fi
+      
+      # Print progress every 10 requests
+      if [ $((i % 10)) -eq 0 ]; then
+        echo " $i/$NUM_REQUESTS"
+      fi
+      
+      # Small delay to avoid rate limiting
+      sleep 0.2
+    done
+    
+    echo ""
+    echo ""
+    echo "Results:"
+    echo "--------"
+    echo "UK South: $uk_south_count requests ($$(echo "scale=2; $uk_south_count*100/$NUM_REQUESTS" | bc)%)"
+    echo "UK West: $uk_west_count requests ($$(echo "scale=2; $uk_west_count*100/$NUM_REQUESTS" | bc)%)"
+    echo "Errors: $error_count requests ($$(echo "scale=2; $error_count*100/$NUM_REQUESTS" | bc)%)"
+    echo ""
+    EOF
+  }
+}
+
+# Create test pod to run traffic distribution test
+resource "kubernetes_pod" "traffic_test_runner" {
+  provider = kubernetes.uksouth
+  metadata {
+    name      = "traffic-test-runner"
+    namespace = kubernetes_namespace.traffic_test_uksouth.metadata[0].name
+  }
+
+  spec {
+    container {
+      name    = "test-runner"
+      image   = "curlimages/curl:latest"
+      command = ["/bin/sh", "-c", "cp /scripts/test-distribution.sh /tmp && chmod +x /tmp/test-distribution.sh && sleep 3600"]
+
+      volume_mount {
+        name       = "test-script"
+        mount_path = "/scripts"
+      }
+    }
+
+    volume {
+      name = "test-script"
+      config_map {
+        name = kubernetes_config_map.traffic_test_script.metadata[0].name
+      }
+    }
+  }
+}
+
+# Output instructions for running the test
+output "traffic_test_instructions" {
+  description = "Instructions for testing traffic distribution"
+  value = <<-EOT
+    To test the traffic distribution between UK South and UK West clusters:
+    
+    1. Wait for all resources to be deployed (5-10 minutes)
+    
+    2. Run the test script with the following command:
+       kubectl --kubeconfig ~/.kube/config-uksouth exec -it -n traffic-test traffic-test-runner -- /tmp/test-distribution.sh
+    
+    3. For a visual test, you can use this command to make 100 requests and see the distribution:
+       for i in {1..100}; do 
+         curl -s https://${azurerm_cdn_frontdoor_endpoint.endpoint.host_name}/traffic-test | grep -o "UK [A-Z]*" || echo "Error";
+         sleep 0.2;
+       done | sort | uniq -c
+  EOT
 } 
