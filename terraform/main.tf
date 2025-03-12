@@ -41,14 +41,33 @@ data "azurerm_key_vault_secret" "git_pat" {
   key_vault_id = data.azurerm_key_vault.secrets.id
 }
 
+# Configure Kubernetes Providers
+provider "kubernetes" {
+  alias = "uksouth"
+  
+  host = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].cluster_ca_certificate)
+}
+
+provider "kubernetes" {
+  alias = "ukwest"
+  
+  host = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
+}
+
 # Helm provider configuration for UK South cluster
 provider "helm" {
   alias = "uksouth"
   kubernetes {
-    host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
+    host = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config[0].cluster_ca_certificate)
   }
 }
 
@@ -56,72 +75,11 @@ provider "helm" {
 provider "helm" {
   alias = "ukwest"
   kubernetes {
-    host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
+    host = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config[0].cluster_ca_certificate)
   }
-}
-
-# Configure Kubernetes Providers
-provider "kubernetes" {
-  alias                  = "uksouth"
-  host                   = data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].host
-  client_certificate     = base64decode(data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].client_certificate)
-  client_key             = base64decode(data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.aks_uksouth.kube_config[0].cluster_ca_certificate)
-
-  depends_on = [
-    azurerm_kubernetes_cluster.aks_uksouth
-  ]
-}
-
-provider "kubernetes" {
-  alias                  = "ukwest"
-  host                   = data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].host
-  client_certificate     = base64decode(data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].client_certificate)
-  client_key             = base64decode(data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.aks_ukwest.kube_config[0].cluster_ca_certificate)
-
-  depends_on = [
-    azurerm_kubernetes_cluster.aks_ukwest
-  ]
-}
-
-# Data sources for existing AKS clusters
-data "azurerm_kubernetes_cluster" "aks_uksouth" {
-  name                = azurerm_kubernetes_cluster.aks_uksouth.name
-  resource_group_name = var.aks_resource_group_name
-  depends_on         = [azurerm_kubernetes_cluster.aks_uksouth]
-}
-
-data "azurerm_kubernetes_cluster" "aks_ukwest" {
-  name                = azurerm_kubernetes_cluster.aks_ukwest.name
-  resource_group_name = var.aks_resource_group_name
-  depends_on         = [azurerm_kubernetes_cluster.aks_ukwest]
-}
-
-# Data sources for Istio Gateway services
-data "kubernetes_service" "istio_gateway_uksouth" {
-  provider = kubernetes.uksouth
-  metadata {
-    name      = "istio-gateway"
-    namespace = "istio-system"
-  }
-  depends_on = [
-    helm_release.istio_gateway_uksouth
-  ]
-}
-
-data "kubernetes_service" "istio_gateway_ukwest" {
-  provider = kubernetes.ukwest
-  metadata {
-    name      = "istio-gateway"
-    namespace = "istio-system"
-  }
-  depends_on = [
-    helm_release.istio_gateway_ukwest
-  ]
 }
 
 # Create Resource Group
@@ -173,16 +131,12 @@ resource "azurerm_cdn_frontdoor_origin" "origin_uksouth" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = data.kubernetes_service.istio_gateway_uksouth.status[0].load_balancer[0].ingress[0].ip
+  host_name                      = azurerm_kubernetes_cluster.uksouth.kube_config[0].host
   http_port                      = 80
   https_port                     = 80
   origin_host_header             = var.app_hostname
   priority                       = 1
   weight                         = 50
-
-  depends_on = [
-    data.kubernetes_service.istio_gateway_uksouth
-  ]
 }
 
 # Create Front Door Origin for UK West
@@ -192,16 +146,12 @@ resource "azurerm_cdn_frontdoor_origin" "origin_ukwest" {
   enabled                       = true
 
   certificate_name_check_enabled = false
-  host_name                      = data.kubernetes_service.istio_gateway_ukwest.status[0].load_balancer[0].ingress[0].ip
+  host_name                      = azurerm_kubernetes_cluster.ukwest.kube_config[0].host
   http_port                      = 80
   https_port                     = 80
   origin_host_header             = var.app_hostname
   priority                       = 1
   weight                         = 50
-
-  depends_on = [
-    data.kubernetes_service.istio_gateway_ukwest
-  ]
 }
 
 # Create Front Door Route
@@ -471,7 +421,7 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
   }
   depends_on = [
     helm_release.argocd_uksouth,
-    azurerm_kubernetes_cluster.aks_uksouth
+    kubernetes_namespace.argocd_uksouth
   ]
 }
 
@@ -497,7 +447,7 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
   }
   depends_on = [
     helm_release.argocd_ukwest,
-    azurerm_kubernetes_cluster.aks_ukwest
+    kubernetes_namespace.argocd_ukwest
   ]
 }
 
@@ -529,7 +479,8 @@ resource "kubernetes_manifest" "argocd_project_uksouth" {
     }
   }
   depends_on = [
-    kubernetes_manifest.argocd_repo_uksouth
+    kubernetes_manifest.argocd_repo_uksouth,
+    helm_release.argocd_uksouth
   ]
 }
 
@@ -561,7 +512,8 @@ resource "kubernetes_manifest" "argocd_project_ukwest" {
     }
   }
   depends_on = [
-    kubernetes_manifest.argocd_repo_ukwest
+    kubernetes_manifest.argocd_repo_ukwest,
+    helm_release.argocd_ukwest
   ]
 }
 
@@ -582,4 +534,15 @@ resource "kubernetes_manifest" "istio_applicationsets" {
     kubernetes_manifest.argocd_repo_uksouth,
     kubernetes_manifest.argocd_repo_ukwest
   ]
+}
+
+# Output the kubeconfig for both clusters
+output "uksouth_kube_config" {
+  value     = azurerm_kubernetes_cluster.uksouth.kube_config_raw
+  sensitive = true
+}
+
+output "ukwest_kube_config" {
+  value     = azurerm_kubernetes_cluster.ukwest.kube_config_raw
+  sensitive = true
 } 
