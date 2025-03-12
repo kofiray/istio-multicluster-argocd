@@ -1,0 +1,30 @@
+# AKS Cluster Configuration
+aks_resource_group_name = "istio-aks-rg"
+resource_group_name     = "istio-frontdoor-rg"
+
+# Kubeconfig Paths
+uksouth_kubeconfig_path = "~/.kube/config-uksouth"
+ukwest_kubeconfig_path  = "~/.kube/config-ukwest"
+
+# Azure Front Door Configuration
+frontdoor_profile_name        = "istio-frontdoor"
+frontdoor_endpoint_name      = "istio-endpoint"
+frontdoor_origin_group_name  = "istio-origin-group"
+frontdoor_origin_name_uksouth = "uksouth-origin"
+frontdoor_origin_name_ukwest  = "ukwest-origin"
+frontdoor_route_name         = "istio-route"
+app_hostname                 = "istio.example.com"
+
+# Git Repository Configuration
+git_repository_url = "https://github.com/yourusername/istio-multicluster-argocd.git"
+git_username      = "your-github-username"
+
+# ArgoCD Configuration
+argocd_helm_version = "5.51.6"
+
+# Resource Tags
+tags = {
+  Environment = "Production"
+  Project     = "Istio-MultiCluster"
+  ManagedBy   = "Terraform"
+} 

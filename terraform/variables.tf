@@ -45,9 +45,13 @@ variable "location" {
 }
 
 variable "tags" {
-  description = "Tags to apply to resources"
+  description = "Tags to apply to all resources"
   type        = map(string)
-  default     = {}
+  default = {
+    Environment = "Production"
+    Project     = "Istio-MultiCluster"
+    ManagedBy   = "Terraform"
+  }
 }
 
 variable "frontdoor_profile_name" {
@@ -102,19 +106,17 @@ variable "ukwest_kubeconfig_path" {
 }
 
 variable "git_repository_url" {
-  description = "URL of the Git repository containing Istio configurations"
+  description = "URL of the Git repository for ArgoCD"
   type        = string
-  default     = "https://github.com/kofiray/istio-multicluster-argocd.git"
 }
 
 variable "git_username" {
   description = "Username for Git repository authentication"
   type        = string
-  default     = "git"
 }
 
 variable "argocd_helm_version" {
-  description = "Version of ArgoCD Helm chart to install"
+  description = "Version of the ArgoCD Helm chart to install"
   type        = string
   default     = "5.51.6"
 } 
