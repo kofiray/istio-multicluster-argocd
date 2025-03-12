@@ -1,20 +1,20 @@
 terraform {
   required_providers {
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = ">= 2.0.0"
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = ">= 2.0.0"
+      version = "~> 2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
     }
     kubectl = {
       source  = "gavinbunney/kubectl"
       version = ">= 1.14.0"
-    }
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 2.0.0"
     }
   }
   required_version = ">= 1.0.0"
@@ -24,14 +24,44 @@ provider "azurerm" {
   features {}
 }
 
-provider "kubernetes" {
+# Helm provider configuration for UK South cluster
+provider "helm" {
   alias = "uksouth"
-  config_path = var.uksouth_kubeconfig_path
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
+  }
 }
 
-provider "kubernetes" {
+# Helm provider configuration for UK West cluster
+provider "helm" {
   alias = "ukwest"
-  config_path = var.ukwest_kubeconfig_path
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
+  }
+}
+
+# Kubernetes provider for UK South
+provider "kubernetes" {
+  alias                  = "uksouth"
+  host                   = azurerm_kubernetes_cluster.uksouth.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.uksouth.kube_config.0.cluster_ca_certificate)
+}
+
+# Kubernetes provider for UK West
+provider "kubernetes" {
+  alias                  = "ukwest"
+  host                   = azurerm_kubernetes_cluster.ukwest.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.ukwest.kube_config.0.cluster_ca_certificate)
 }
 
 # Create Resource Group
@@ -154,4 +184,86 @@ resource "azurerm_cdn_frontdoor_route" "route" {
     compression_enabled           = true
     content_types_to_compress     = ["text/html", "text/javascript", "text/css", "application/json"]
   }
+}
+
+# Create ArgoCD namespace in UK South
+resource "kubernetes_namespace" "argocd_uksouth" {
+  provider = kubernetes.uksouth
+  metadata {
+    name = "argocd"
+  }
+}
+
+# Create ArgoCD namespace in UK West
+resource "kubernetes_namespace" "argocd_ukwest" {
+  provider = kubernetes.ukwest
+  metadata {
+    name = "argocd"
+  }
+}
+
+# Install ArgoCD in UK South cluster
+resource "helm_release" "argocd_uksouth" {
+  provider   = helm.uksouth
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  version    = var.argocd_helm_version
+  namespace  = kubernetes_namespace.argocd_uksouth.metadata[0].name
+
+  values = [
+    yamlencode({
+      server = {
+        extraArgs = ["--insecure"]
+        service = {
+          type = "LoadBalancer"
+        }
+      }
+      controller = {
+        replicas = 1
+      }
+      repoServer = {
+        replicas = 1
+      }
+      applicationSet = {
+        enabled = true
+      }
+      ha = {
+        enabled = true
+      }
+    })
+  ]
+}
+
+# Install ArgoCD in UK West cluster
+resource "helm_release" "argocd_ukwest" {
+  provider   = helm.ukwest
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  version    = var.argocd_helm_version
+  namespace  = kubernetes_namespace.argocd_ukwest.metadata[0].name
+
+  values = [
+    yamlencode({
+      server = {
+        extraArgs = ["--insecure"]
+        service = {
+          type = "LoadBalancer"
+        }
+      }
+      controller = {
+        replicas = 1
+      }
+      repoServer = {
+        replicas = 1
+      }
+      applicationSet = {
+        enabled = true
+      }
+      ha = {
+        enabled = true
+      }
+    })
+  ]
 } 

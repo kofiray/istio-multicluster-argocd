@@ -99,4 +99,10 @@ variable "uksouth_kubeconfig_path" {
 variable "ukwest_kubeconfig_path" {
   description = "Path to the kubeconfig file for UK West cluster"
   type        = string
+}
+
+variable "argocd_helm_version" {
+  description = "Version of the ArgoCD Helm chart to install"
+  type        = string
+  default     = "5.51.6"  # Latest stable version as of now
 } 

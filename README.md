@@ -7,7 +7,7 @@ This repository contains the configuration for managing Istio across multiple AK
 - Azure CLI installed and configured
 - Terraform v1.0.0 or later
 - kubectl installed
-- ArgoCD installed in your clusters
+- Helm v3.0.0 or later
 - Azure subscription with necessary permissions
 
 ## Repository Structure
@@ -42,50 +42,39 @@ istio-multicluster-argocd/
    ```
    Edit `terraform.tfvars` with your specific values.
 
-3. Initialize and apply Terraform to create AKS clusters and Front Door:
+3. Initialize and apply Terraform to create AKS clusters and install ArgoCD:
    ```bash
    terraform init
    terraform plan
    terraform apply
    ```
-   This will create:
-   - Two AKS clusters (UK South and UK West)
-   - Azure Front Door profile
-   - Required networking and security configurations
+   This will:
+   - Create two AKS clusters (UK South and UK West)
+   - Install ArgoCD in both clusters using Helm
+   - Configure Azure Front Door
+   - Set up required networking and security configurations
 
-4. Get kubeconfig for both clusters:
+4. Access ArgoCD UI:
    ```bash
-   az aks get-credentials --resource-group aks-istio-rg --name aks-uksouth --file ~/.kube/config-uksouth
-   az aks get-credentials --resource-group aks-istio-rg --name aks-ukwest --file ~/.kube/config-ukwest
-   ```
+   # Get ArgoCD admin password for UK South cluster
+   kubectl --kubeconfig ~/.kube/config-uksouth -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
-5. Install ArgoCD in both clusters:
-   ```bash
-   kubectl --kubeconfig ~/.kube/config-uksouth create namespace argocd
-   kubectl --kubeconfig ~/.kube/config-uksouth apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-   
-   kubectl --kubeconfig ~/.kube/config-ukwest create namespace argocd
-   kubectl --kubeconfig ~/.kube/config-ukwest apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-   ```
+   # Get ArgoCD admin password for UK West cluster
+   kubectl --kubeconfig ~/.kube/config-ukwest -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
-6. Apply ArgoCD ApplicationSets for Istio components:
+   # Get ArgoCD LoadBalancer IP for UK South
+   kubectl --kubeconfig ~/.kube/config-uksouth -n argocd get svc argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+
+   # Get ArgoCD LoadBalancer IP for UK West
+   kubectl --kubeconfig ~/.kube/config-ukwest -n argocd get svc argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+   ```
+   Access the ArgoCD UI at `https://<LOAD_BALANCER_IP>` with username `admin` and the password obtained above.
+
+5. Apply ArgoCD ApplicationSets for Istio components:
    ```bash
    kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/istio-base.yaml
    kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/istiod.yaml
    kubectl --kubeconfig ~/.kube/config-uksouth apply -f applicationsets/gateway.yaml
-   ```
-
-7. Verify the setup:
-   ```bash
-   # Check Istio pods in both clusters
-   kubectl --kubeconfig ~/.kube/config-uksouth get pods -n istio-system
-   kubectl --kubeconfig ~/.kube/config-ukwest get pods -n istio-system
-   
-   # Check Front Door endpoint
-   az network front-door endpoint show \
-     --resource-group istio-frontdoor-rg \
-     --profile-name istio-frontdoor \
-     --endpoint-name istio-app
    ```
 
 ## Configuration Details
@@ -110,45 +99,14 @@ istio-multicluster-argocd/
 - Istiod control plane
 - Ingress gateways with Azure Front Door integration
 
+### ArgoCD Installation
+- Installed via Helm chart (version 5.51.6)
+- High Availability (HA) mode enabled
+- ApplicationSet controller enabled
+- LoadBalancer service type for UI access
+- Insecure mode enabled (consider configuring TLS in production)
+
 ## Maintenance
 
 ### Updating Kubernetes Version
-1. Update `kubernetes_version` in terraform.tfvars
-2. Run `terraform plan` and `terraform apply`
-
-### Adding New Clusters
-1. Add new cluster configuration in aks-clusters.tf
-2. Add corresponding Front Door origin in main.tf
-3. Update ApplicationSets to include new cluster
-
-## Troubleshooting
-
-1. Check cluster health:
-   ```bash
-   az aks show -g aks-istio-rg -n aks-uksouth --query 'provisioningState'
-   az aks show -g aks-istio-rg -n aks-ukwest --query 'provisioningState'
-   ```
-
-2. Verify Istio installation:
-   ```bash
-   istioctl verify-install --kubeconfig ~/.kube/config-uksouth
-   istioctl verify-install --kubeconfig ~/.kube/config-ukwest
-   ```
-
-3. Check Front Door routing:
-   ```bash
-   az network front-door route show \
-     --resource-group istio-frontdoor-rg \
-     --profile-name istio-frontdoor \
-     --name istio-route
-   ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
-## License
-
-MIT License 
+1. Update `
