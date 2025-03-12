@@ -449,9 +449,9 @@ output "traffic_test_instructions" {
 }
 
 # ArgoCD Repository Configuration for UK South
-resource "kubernetes_manifest" "argocd_repo_uksouth" {
-  provider = kubernetes.uksouth
-  manifest = {
+resource "kubectl_manifest" "argocd_repo_uksouth" {
+  provider = kubectl.uksouth
+  yaml_body = yamlencode({
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
@@ -467,7 +467,7 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
       username = var.git_username
       password = data.azurerm_key_vault_secret.git_pat_token.value
     }
-  }
+  })
   depends_on = [
     kubernetes_namespace.argocd_uksouth,
     azurerm_kubernetes_cluster.uksouth,
@@ -477,9 +477,9 @@ resource "kubernetes_manifest" "argocd_repo_uksouth" {
 }
 
 # ArgoCD Repository Configuration for UK West
-resource "kubernetes_manifest" "argocd_repo_ukwest" {
-  provider = kubernetes.ukwest
-  manifest = {
+resource "kubectl_manifest" "argocd_repo_ukwest" {
+  provider = kubectl.ukwest
+  yaml_body = yamlencode({
     apiVersion = "v1"
     kind       = "Secret"
     metadata = {
@@ -495,7 +495,7 @@ resource "kubernetes_manifest" "argocd_repo_ukwest" {
       username = var.git_username
       password = data.azurerm_key_vault_secret.git_pat_token.value
     }
-  }
+  })
   depends_on = [
     kubernetes_namespace.argocd_ukwest,
     azurerm_kubernetes_cluster.ukwest,
@@ -532,7 +532,7 @@ resource "kubectl_manifest" "argocd_project_uksouth" {
     }
   })
   depends_on = [
-    kubernetes_manifest.argocd_repo_uksouth,
+    kubectl_manifest.argocd_repo_uksouth,
     helm_release.argocd_uksouth
   ]
 }
@@ -565,7 +565,7 @@ resource "kubectl_manifest" "argocd_project_ukwest" {
     }
   })
   depends_on = [
-    kubernetes_manifest.argocd_repo_ukwest,
+    kubectl_manifest.argocd_repo_ukwest,
     helm_release.argocd_ukwest
   ]
 }
@@ -584,7 +584,7 @@ resource "kubectl_manifest" "istio_applicationsets" {
   depends_on = [
     kubectl_manifest.argocd_project_uksouth,
     kubectl_manifest.argocd_project_ukwest,
-    kubernetes_manifest.argocd_repo_uksouth,
-    kubernetes_manifest.argocd_repo_ukwest
+    kubectl_manifest.argocd_repo_uksouth,
+    kubectl_manifest.argocd_repo_ukwest
   ]
 } 
